@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente FTIR · Fique-GO</title>
+<link rel="stylesheet" href="../assets/css/estilo.css">
+</head>
+<body>
+<header class="top">
+  <h1>Asistente FTIR</h1>
+  <span class="sub">Fique-GO · fibra de fique + resina + óxido de grafeno</span>
+  <nav><a href="../index.html">← Inicio</a><a href="#" id="tema">Tema claro/oscuro</a></nav>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="card">
+    <h2>1 · Espectros</h2>
+    <div class="drop" id="drop" tabindex="0">Arrastra archivos aquí o haz clic<br><small>CSV / TXT / DPT / DAT · columna 1 = cm⁻¹, columna 2 = señal</small></div>
+    <input type="file" id="archivo" multiple accept=".csv,.txt,.dpt,.dat,.asc,.tsv" hidden>
+    <div class="row" style="margin-top:8px">
+      <button id="btnEjemplos" class="primary">Cargar ejemplos sintéticos</button>
+      <button id="btnLimpiar">Quitar todos</button>
+    </div>
+    <div id="errores"></div>
+    <div id="lista"></div>
+    <p class="hint">Cada espectro puede ser absorbancia, transmitancia (0–1) o %T. En “auto” se detecta y se convierte a absorbancia.</p>
+  </div>
+
+  <div class="card">
+    <h2>2 · Procesamiento</h2>
+    <label for="base">Línea base</label>
+    <select id="base"><option value="none">Ninguna</option><option value="rubber" selected>Banda elástica (rubber-band)</option><option value="linear">Lineal (extremos)</option></select>
+    <label for="suav">Suavizado Savitzky–Golay: ventana <small id="suavV">9</small></label>
+    <input type="range" id="suav" min="1" max="41" step="2" value="9">
+    <label for="norm">Normalización</label>
+    <select id="norm"><option value="none">Ninguna</option><option value="max" selected>Máximo = 1</option><option value="minmax">Mín–máx (0–1)</option></select>
+    <div class="row"><div><label for="xmin">cm⁻¹ mín</label><input type="number" id="xmin" value="400"></div><div><label for="xmax">cm⁻¹ máx</label><input type="number" id="xmax" value="4000"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Detección y asignación</h2>
+    <label for="prom">Prominencia mínima <small id="promV">2 %</small></label>
+    <input type="range" id="prom" min="0.2" max="30" step="0.2" value="2">
+    <label for="dist">Separación mínima entre picos (cm⁻¹)</label>
+    <input type="number" id="dist" value="8" min="0" max="100">
+    <label for="tol">Tolerancia de asignación ± <small id="tolV">8 cm⁻¹</small></label>
+    <input type="range" id="tol" min="1" max="30" step="1" value="8">
+    <div class="check"><input type="checkbox" id="hombros"><label for="hombros" style="margin:0">Detectar hombros (2ª derivada)</label></div>
+    <label>Materiales a considerar</label>
+    <div class="check"><input type="checkbox" class="mat" value="fibra" id="m1" checked><label for="m1" style="margin:0">Fibra natural (celulosa, hemicelulosa, lignina)</label></div>
+    <div class="check"><input type="checkbox" class="mat" value="go" id="m2" checked><label for="m2" style="margin:0">Óxido de grafeno</label></div>
+    <div class="check"><input type="checkbox" class="mat" value="epoxi" id="m3" checked><label for="m3" style="margin:0">Resina epóxica</label></div>
+    <div class="check"><input type="checkbox" class="mat" value="artefacto" id="m4" checked><label for="m4" style="margin:0">Artefactos (CO₂, cristal ATR)</label></div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Visualización y exportación</h2>
+    <div class="check"><input type="checkbox" id="apilar" checked><label for="apilar" style="margin:0">Apilar espectros (desplazamiento vertical)</label></div>
+    <div class="check"><input type="checkbox" id="etiquetas" checked><label for="etiquetas" style="margin:0">Etiquetar picos del espectro activo</label></div>
+    <div class="check"><input type="checkbox" id="bandas"><label for="bandas" style="margin:0">Sombrear bandas clave de referencia</label></div>
+    <div class="row" style="margin-top:8px"><button id="expPng">PNG</button><button id="expSvg">SVG</button><button id="expCsv">Picos CSV</button></div>
+  </div>
+</aside>
+
+<main>
+  <div class="card"><div id="plot"></div></div>
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-p="pPicos">Picos y asignaciones</button>
+      <button role="tab" aria-selected="false" data-p="pEvid">Evidencia por componente</button>
+      <button role="tab" aria-selected="false" data-p="pManual">Consulta manual</button>
+      <button role="tab" aria-selected="false" data-p="pBase">Base de bandas</button>
+      <button role="tab" aria-selected="false" data-p="pRefs">Referencias</button>
+    </div>
+    <div class="pane on" id="pPicos"></div>
+    <div class="pane" id="pEvid"></div>
+    <div class="pane" id="pManual">
+      <label for="manualIn">Escribe números de onda (cm⁻¹) separados por coma, espacio o salto de línea</label>
+      <textarea id="manualIn" placeholder="3340, 1735, 1510, 1245, 1050, 897"></textarea>
+      <div id="manualOut" style="margin-top:10px"></div>
+    </div>
+    <div class="pane" id="pBase">
+      <div class="row" style="margin-bottom:10px"><input type="text" id="filtroBase" placeholder="Buscar: cm⁻¹, grupo, componente…"><label class="btn" style="margin:0;flex:0 0 auto">Importar bandas (.json)<input type="file" id="impJson" accept=".json" hidden></label></div>
+      <div id="baseOut" class="tblwrap"></div>
+      <p class="hint">Formato JSON de importación: <code>[{"min":1730,"max":1740,"grupo":"C=O","componente":"Fique","material":"fibra","clave":true,"refs":[],"nota":"","refTexto":"Autor (año)"}]</code></p>
+    </div>
+    <div class="pane" id="pRefs"></div>
+  </div>
+</main>
+</div>
+<p class="foot">Herramienta de apoyo a la asignación: un solo pico rara vez identifica un compuesto. Contrasta siempre con la bibliografía y con tu material de referencia. Los datos se procesan en tu navegador; no se suben a ningún servidor.</p>
+
+<script src="../assets/vendor/plotly.min.js"></script>
+<script src="data/bandas.js"></script>
+<script src="data/ejemplos.js"></script>
+<script src="js/procesamiento.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
